@@ -6,6 +6,7 @@ from app import db
 from schema.FormSchema import FormSchema
 from schema.FormDataSchema import FormDataSchema
 import datetime
+from flask_cors import CORS, cross_origin
 
 form_schema = FormSchema(strict=True)
 forms_schema = FormSchema(many=True, strict=True)
@@ -18,20 +19,28 @@ forms_data_schema = FormDataSchema(many=True, strict=True)
 def index():
     return '<h2>You can start using the service by making a POST request to /api/forms</h2>'
 
-@app.route('/api/forms', methods=['POST'])
+@app.route('/api/forms', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
 def forms():
-    # create a new form
-    name = request.json['name']
-    description = request.json['description']
 
-    form = Form(name, description)
+    if request.method == 'GET':
+        form = Form.query.all()
+        return forms_schema.jsonify(form)
 
-    db.session.add(form)
-    db.session.commit()
+    if request.method == 'POST':
+        # create a new form
+        name = request.json['name']
+        description = request.json['description']
 
-    return form_schema.jsonify(form)
+        form = Form(name, description)
+
+        db.session.add(form)
+        db.session.commit()
+
+        return form_schema.jsonify(form)
 
 @app.route('/api/forms/<id>', methods=['GET', 'PUT'])
+@cross_origin(supports_credentials=True)
 def forms_item(id):
     if request.method == 'GET':
         form = Form.query.get(id)
@@ -50,6 +59,7 @@ def forms_item(id):
         return form_schema.jsonify(form)
 
 @app.route('/api/forms/<form_id>/data', methods=['GET', 'POST'])
+@cross_origin(supports_credentials=True)
 def forms_data(form_id):
 
     if request.method == 'GET':
@@ -73,8 +83,9 @@ def forms_data(form_id):
         return form_data_schema.jsonify(form_data)
 
 @app.route('/api/forms/<form_id>/data/<form_data_id>', methods=['GET'])
+@cross_origin(supports_credentials=True)
 def forms_data_item(form_id, form_data_id):
-    
+
     if request.method == 'GET':
         form_data_item = FormData.query.filter_by(form_id=form_id, id=form_data_id).first()
 
