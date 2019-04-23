@@ -3,8 +3,10 @@
 A simple API service for storing and retrieving JSON data in flask
 
 I built this is part of a learning series on Flask.
-Part 1:
-Part 2:
+
+Part 1: https://www.youtube.com/watch?v=88ulEksE_wM
+
+Part 2: https://www.youtube.com/watch?v=K40H0nsw6Oo
 
 To get this up and running:
 
