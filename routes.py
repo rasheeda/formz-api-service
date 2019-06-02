@@ -7,6 +7,7 @@ from schema.FormSchema import FormSchema
 from schema.FormDataSchema import FormDataSchema
 import datetime
 from flask_cors import CORS, cross_origin
+import uuid
 
 form_schema = FormSchema(strict=True)
 forms_schema = FormSchema(many=True, strict=True)
@@ -35,6 +36,7 @@ def forms():
                 'description': form.description,
                 'created_at': form.created_at,
                 'updated_at': form.updated_at,
+                'unique_id': form.unique_id,
                 'data_items_count': FormData.query.filter_by(form_id=form.id).count()
             }
 
@@ -48,19 +50,20 @@ def forms():
         description = request.json['description']
         created_at = datetime.datetime.now()
         updated_at = datetime.datetime.now()
+        unique_id = uuid.uuid4().hex
 
-        form = Form(name, description, created_at, updated_at)
+        form = Form(name, description, unique_id, created_at, updated_at)
 
         db.session.add(form)
         db.session.commit()
 
         return form_schema.jsonify(form)
 
-@app.route('/api/formz/<id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
+@app.route('/api/formz/<unique_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
 @cross_origin(supports_credentials=True)
-def forms_item(id):
+def forms_item(unique_id):
 
-    form = Form.query.get(id)
+    form = Form.query.filter_by(unique_id=unique_id).first()
 
     if request.method == 'GET':
         
@@ -83,18 +86,20 @@ def forms_item(id):
         db.session.commit()
 
 
-@app.route('/api/formz/<form_id>/data', methods=['GET', 'POST'])
+@app.route('/api/formz/<form_unique_id>/data', methods=['GET', 'POST'])
 @cross_origin(supports_credentials=True)
-def forms_data(form_id):
+def forms_data(form_unique_id):
+
+    form = Form.query.filter_by(unique_id=form_unique_id).first()
 
     if request.method == 'GET':
-        form_data = FormData.query.filter_by(form_id=form_id).all()
+        form_data = FormData.query.filter_by(form_id=form.id).all()
 
         return forms_data_schema.jsonify(form_data)
 
     if request.method == 'POST':
         name = request.json['name']
-        form_id = form_id
+        form_id = form_unique_id
         description = request.json['description']
         data = request.json['data']
         created_at = datetime.datetime.now()
@@ -107,20 +112,22 @@ def forms_data(form_id):
 
         return form_data_schema.jsonify(form_data)
 
-@app.route('/api/formz/<form_id>/data/<form_data_id>', methods=['GET'])
+@app.route('/api/formz/<form_unique_id>/data/<form_data_id>', methods=['GET'])
 @cross_origin(supports_credentials=True)
-def forms_data_item(form_id, form_data_id):
+def forms_data_item(form_unique_id, form_data_id):
+
+    form = Form.query.filter_by(unique_id=form_unique_id).first()
 
     if request.method == 'GET':
-        form_data_item = FormData.query.filter_by(form_id=form_id, id=form_data_id).first()
+        form_data_item = FormData.query.filter_by(form_id=form.id, id=form_data_id).first()
 
         return form_data_schema.jsonify(form_data_item)
 
-@app.route('/api/formz/<form_id>/data/count', methods=['GET'])
+@app.route('/api/formz/<form_unique_id>/data/count', methods=['GET'])
 @cross_origin(supports_credentials=True)
-def forms_data_count(form_id):
+def forms_data_count(form_unique_id):
     # count number form data items
-    countFormData = FormData.query.filter_by(form_id=form_id).count()
+    countFormData = FormData.query.filter_by(unique_id=form_unique_id).count()
 
     return jsonify(count=countFormData)
 
