@@ -66,7 +66,7 @@ def forms_item(unique_id):
     form = Form.query.filter_by(unique_id=unique_id).first()
 
     if request.method == 'GET':
-        
+
         return form_schema.jsonify(form)
 
     if (request.method == 'PUT' or request.method == 'POST'):
@@ -131,3 +131,55 @@ def forms_data_count(form_unique_id):
 
     return jsonify(count=countFormData)
 
+
+@app.route('/api/formz/data/graph', methods=['GET'])
+def formz_data_count_graph():
+    # get the number of formz data per form and return the results structured like this
+    # {
+    #   {form_name: "kkkkk", "data_count": 5}
+    # }
+
+    if request.method == 'GET':
+        formz = Form.query.all()
+
+        graph_data = [];
+
+        for form in formz:
+            data = {
+                'form_name': form.name,
+                'form_data_count': form_data_count(form.id)
+            }
+
+            graph_data.append(data)
+
+        return jsonify(graph_data)
+
+@app.route('/api/formz/data/count/graph', methods=['GET'])
+def formz_period_data_count_graph():
+    # The number of data posted per day for all forms belonging to user
+    # {data:"dddd", data_count:49}
+    if request.method == 'GET':
+        # formz_data = FormData.query.group_by(FormData.created_at).limit(10).all()
+        rows = db.engine.execute("SELECT COUNT(id) as count, CAST(created_at AS DATE) AS date FROM form_data GROUP BY CAST(created_at AS DATE)")
+        data = []
+
+        for row in rows:
+            record = {
+                "count": row.count,
+                "date": row.date.strftime("%x")
+            }
+
+            data.append(record)
+
+        return jsonify(data)
+
+@app.route('/api/formz/data/count', methods=['GET'])
+def user_formz_data_count():
+    if request.method == 'GET':
+        # get the total number of forms for a user
+        forms_count = Form.query.count();
+
+        return forms_count
+
+def form_data_count(form_id):
+    return FormData.query.filter_by(form_id=form_id).count();
