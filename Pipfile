@@ -11,6 +11,7 @@ flask = "*"
 flask-sqlalchemy = "*"
 flask-marshmallow = "*"
 marshmallow-sqlalchemy = "*"
+pymysql = "*"
 
 [requires]
 python_version = "3.6"
