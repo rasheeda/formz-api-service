@@ -8,6 +8,7 @@ from schema.FormDataSchema import FormDataSchema
 import datetime
 from flask_cors import CORS, cross_origin
 import uuid
+from models.UserModel import User
 
 form_schema = FormSchema(strict=True)
 forms_schema = FormSchema(many=True, strict=True)
@@ -99,7 +100,7 @@ def forms_data(form_unique_id):
 
     if request.method == 'POST':
         name = request.json['name']
-        form_id = form_unique_id
+        form_id = form.id
         description = request.json['description']
         data = request.json['data']
         created_at = datetime.datetime.now()
@@ -183,3 +184,17 @@ def user_formz_data_count():
 
 def form_data_count(form_id):
     return FormData.query.filter_by(form_id=form_id).count();
+
+@app.route('/api/users/register', methods=['POST'])
+def register_user():
+
+    if request.method == 'POST':
+        email = request.json['email']
+        password = request.json['password']
+
+        user = User(email, password, '', '', datetime.datetime.now(), datetime.datetime.now())
+        user.hash_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        return jsonify({'email': user.email, 'id': user.id})
