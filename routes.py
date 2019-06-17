@@ -9,6 +9,7 @@ import datetime
 from flask_cors import CORS, cross_origin
 import uuid
 from models.UserModel import User
+from flask_httpauth import HTTPBasicAuth
 
 form_schema = FormSchema(strict=True)
 forms_schema = FormSchema(many=True, strict=True)
@@ -16,6 +17,7 @@ forms_schema = FormSchema(many=True, strict=True)
 form_data_schema = FormDataSchema(strict=True)
 forms_data_schema = FormDataSchema(many=True, strict=True)
 
+auth = HTTPBasicAuth()
 
 @app.route('/')
 def index():
@@ -186,7 +188,7 @@ def form_data_count(form_id):
     return FormData.query.filter_by(form_id=form_id).count();
 
 @app.route('/api/users/register', methods=['POST'])
-def register_user():
+def register():
 
     if request.method == 'POST':
         email = request.json['email']
@@ -198,3 +200,17 @@ def register_user():
         db.session.commit()
 
         return jsonify({'email': user.email, 'id': user.id})
+
+@app.route('/api/users/login', methods=['POST'])
+@auth.verify_password
+def login(email, password):
+
+    if request.method == 'POST':
+        email = request.json['email']
+        password = request.json['password']
+
+
+@app.route('/api/protected/test', methods=['GET'])
+@auth.login_required
+def protected():
+    return jsonify({'n': 0})
