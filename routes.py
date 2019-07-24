@@ -3,7 +3,6 @@ from models.FormModel import Form
 from models.FormDataModel import FormData
 from flask import request, jsonify
 from app import db
-from schema.FormSchema import FormSchema
 from schema.FormDataSchema import FormDataSchema
 import datetime
 from flask_cors import CORS, cross_origin
@@ -11,9 +10,9 @@ import uuid
 from models.UserModel import User
 from flask_httpauth import HTTPBasicAuth
 from schema.UserSchema import UserSchema
-
-form_schema = FormSchema(strict=True)
-forms_schema = FormSchema(many=True, strict=True)
+import datetime
+from functools import wraps
+import jwt
 
 form_data_schema = FormDataSchema(strict=True)
 forms_data_schema = FormDataSchema(many=True, strict=True)
@@ -22,70 +21,52 @@ user_schema = UserSchema(strict=True)
 
 auth = HTTPBasicAuth()
 
+# a decorator to handle token check
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.args.get('token')
+
+        if not token:
+            return jsonify({'error': 'token is missing'}), 403
+
+        try:
+            data = jwt.decode(token, app.config['JWT_SECRET_KEY'])
+        except:
+            return jsonify({'error': 'invalid token'}), 403
+        
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 @app.route('/')
 def index():
     return '<h2>You can start using the service by making a POST request to /api/forms</h2>'
 
 @app.route('/api/formz', methods=['POST', 'GET'])
 @cross_origin(supports_credentials=True)
+# @token_required
 def forms():
 
     if request.method == 'GET':
-        forms = Form.query.all()
-
-        alteredForms = []
-
-        for form in forms:
-            record = {
-                'id': form.id,
-                'name': form.name,
-                'description': form.description,
-                'created_at': form.created_at,
-                'updated_at': form.updated_at,
-                'unique_id': form.unique_id,
-                'data_items_count': FormData.query.filter_by(form_id=form.id).count()
-            }
-
-            alteredForms.append(record)
-
-        return jsonify(alteredForms)
+        return Form.get(Form())
 
     if request.method == 'POST':
-        # create a new form
-        name = request.json['name']
-        description = request.json['description']
-        created_at = datetime.datetime.now()
-        updated_at = datetime.datetime.now()
-        unique_id = uuid.uuid4().hex
 
-        form = Form(name, description, unique_id, created_at, updated_at)
-
-        db.session.add(form)
-        db.session.commit()
-
-        return form_schema.jsonify(form)
+        return Form.create(Form(), request)
 
 @app.route('/api/formz/<unique_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
 @cross_origin(supports_credentials=True)
+# @token_required
 def forms_item(unique_id):
-
-    form = Form.query.filter_by(unique_id=unique_id).first()
 
     if request.method == 'GET':
 
-        return form_schema.jsonify(form)
+        return Form.getOne(Form(), unique_id)
 
-    if (request.method == 'PUT' or request.method == 'POST'):
-        name = request.json['name']
-        description = request.json['description']
-
-        form.name = name
-        form.description = description
-        form.updated_at = datetime.datetime.now()
-
-        db.session.commit()
-
-        return form_schema.jsonify(form)
+    if request.method == 'PUT':
+        return Form.update(Form(), unique_id, request)
 
     if request.method == 'DELETE':
         db.session.delete(form)
@@ -94,6 +75,7 @@ def forms_item(unique_id):
 
 @app.route('/api/formz/<form_unique_id>/data', methods=['GET', 'POST'])
 @cross_origin(supports_credentials=True)
+@token_required
 def forms_data(form_unique_id):
 
     form = Form.query.filter_by(unique_id=form_unique_id).first()
@@ -120,6 +102,7 @@ def forms_data(form_unique_id):
 
 @app.route('/api/formz/<form_unique_id>/data/<form_data_id>', methods=['GET'])
 @cross_origin(supports_credentials=True)
+@token_required
 def forms_data_item(form_unique_id, form_data_id):
 
     form = Form.query.filter_by(unique_id=form_unique_id).first()
@@ -131,6 +114,7 @@ def forms_data_item(form_unique_id, form_data_id):
 
 @app.route('/api/formz/<form_unique_id>/data/count', methods=['GET'])
 @cross_origin(supports_credentials=True)
+@token_required
 def forms_data_count(form_unique_id):
     # count number form data items
     countFormData = FormData.query.filter_by(unique_id=form_unique_id).count()
@@ -139,6 +123,7 @@ def forms_data_count(form_unique_id):
 
 
 @app.route('/api/formz/data/graph', methods=['GET'])
+@token_required
 def formz_data_count_graph():
     # get the number of formz data per form and return the results structured like this
     # {
@@ -161,6 +146,7 @@ def formz_data_count_graph():
         return jsonify(graph_data)
 
 @app.route('/api/formz/data/count/graph', methods=['GET'])
+@token_required
 def formz_period_data_count_graph():
     # The number of data posted per day for all forms belonging to user
     # {data:"dddd", data_count:49}
@@ -180,6 +166,7 @@ def formz_period_data_count_graph():
         return jsonify(data)
 
 @app.route('/api/formz/data/count', methods=['GET'])
+@token_required
 def user_formz_data_count():
     if request.method == 'GET':
         # get the total number of forms for a user
@@ -217,4 +204,5 @@ def login():
         if not user or not user.verify_password(password):
             return "false"
 
-        return user_schema.jsonify(user)
+        token = jwt.encode({'user': user.id, 'exp': app.config['JWT_ACCESS_TOKEN_EXPIRES'].__str__()}, app.config['JWT_SECRET_KEY'])
+        return jsonify({'token': token.decode('UTF-8')})
