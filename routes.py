@@ -27,6 +27,8 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = request.args.get('token')
 
+        print(request.headers)
+
         if not token:
             return jsonify({'error': 'token is missing'}), 403
 
@@ -34,7 +36,7 @@ def token_required(f):
             data = jwt.decode(token, app.config['JWT_SECRET_KEY'])
         except:
             return jsonify({'error': 'invalid token'}), 403
-        
+
         return f(*args, **kwargs)
 
     return decorated
