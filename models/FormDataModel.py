@@ -13,7 +13,7 @@ class FormData(db.Model):
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.now().time())
     updated_at = Column(DateTime, nullable=False, default=datetime.datetime.now().time())
 
-    
+
     def __init__(self, form_id=None, name=None, description=None, data=None, created_at=None, updated_at=None):
         self.form_id = form_id
         self.name = name
