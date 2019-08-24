@@ -12,7 +12,9 @@ from flask_httpauth import HTTPBasicAuth
 from schema.UserSchema import UserSchema
 import datetime
 from functools import wraps
-import jwt
+from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from models.BlacklistedTokens import BlacklistedTokens
+from app import jwt
 
 form_data_schema = FormDataSchema(strict=True)
 forms_data_schema = FormDataSchema(many=True, strict=True)
@@ -21,35 +23,20 @@ user_schema = UserSchema(strict=True)
 
 auth = HTTPBasicAuth()
 
-# a decorator to handle token check
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.args.get('token')
-
-        print(request.headers)
-
-        if not token:
-            return jsonify({'error': 'token is missing'}), 403
-
-        try:
-            data = jwt.decode(token, app.config['JWT_SECRET_KEY'])
-        except:
-            return jsonify({'error': 'invalid token'}), 403
-
-        return f(*args, **kwargs)
-
-    return decorated
-
-
 @app.route('/')
 def index():
     return '<h2>You can start using the service by making a POST request to /api/forms</h2>'
 
 @app.route('/api/formz', methods=['POST', 'GET'])
 @cross_origin(supports_credentials=True)
-# @token_required
+@jwt_required
 def forms():
+
+    if check_if_token_in_blacklist() == False:
+        return jsonify({'error': 'blacklisted token provided'})
+
+    # retrive the user's identity from the refresh token using a Flask-JWT-Extended built-in method
+    current_user = get_jwt_identity()
 
     if request.method == 'GET':
         return Form.get(Form())
@@ -60,7 +47,7 @@ def forms():
 
 @app.route('/api/formz/<unique_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
 @cross_origin(supports_credentials=True)
-# @token_required
+@jwt_required
 def forms_item(unique_id):
 
     if request.method == 'GET':
@@ -77,7 +64,7 @@ def forms_item(unique_id):
 
 @app.route('/api/formz/<form_unique_id>/data', methods=['GET', 'POST'])
 @cross_origin(supports_credentials=True)
-@token_required
+@jwt_required
 def forms_data(form_unique_id):
 
     form = Form.query.filter_by(unique_id=form_unique_id).first()
@@ -104,7 +91,7 @@ def forms_data(form_unique_id):
 
 @app.route('/api/formz/<form_unique_id>/data/<form_data_id>', methods=['GET'])
 @cross_origin(supports_credentials=True)
-@token_required
+@jwt_required
 def forms_data_item(form_unique_id, form_data_id):
 
     form = Form.query.filter_by(unique_id=form_unique_id).first()
@@ -116,7 +103,7 @@ def forms_data_item(form_unique_id, form_data_id):
 
 @app.route('/api/formz/<form_unique_id>/data/count', methods=['GET'])
 @cross_origin(supports_credentials=True)
-@token_required
+@jwt_required
 def forms_data_count(form_unique_id):
     # count number form data items
     countFormData = FormData.query.filter_by(unique_id=form_unique_id).count()
@@ -125,7 +112,7 @@ def forms_data_count(form_unique_id):
 
 
 @app.route('/api/formz/data/graph', methods=['GET'])
-@token_required
+@jwt_required
 def formz_data_count_graph():
     # get the number of formz data per form and return the results structured like this
     # {
@@ -148,7 +135,7 @@ def formz_data_count_graph():
         return jsonify(graph_data)
 
 @app.route('/api/formz/data/count/graph', methods=['GET'])
-@token_required
+@jwt_required
 def formz_period_data_count_graph():
     # The number of data posted per day for all forms belonging to user
     # {data:"dddd", data_count:49}
@@ -168,7 +155,7 @@ def formz_period_data_count_graph():
         return jsonify(data)
 
 @app.route('/api/formz/data/count', methods=['GET'])
-@token_required
+@jwt_required
 def user_formz_data_count():
     if request.method == 'GET':
         # get the total number of forms for a user
@@ -181,6 +168,7 @@ def form_data_count(form_id):
 
 @app.route('/api/users/register', methods=['POST'])
 @cross_origin(supports_credentials=True)
+@jwt_required
 def register():
 
     if request.method == 'POST':
@@ -206,5 +194,54 @@ def login():
         if not user or not user.verify_password(password):
             return "false"
 
-        token = jwt.encode({'user': user.id, 'exp': app.config['JWT_ACCESS_TOKEN_EXPIRES'].__str__()}, app.config['JWT_SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8')})
+        # when authenticated, return a fresh access token and a refresh token
+        access_token = create_access_token(identity=user.id, fresh=True)
+        refresh_token = create_refresh_token(user.id)
+
+        # token = jwt.encode({'user': user.id, 'exp': app.config['JWT_ACCESS_TOKEN_EXPIRES'].__str__()}, app.config['JWT_SECRET_KEY'])
+        return jsonify({'access_token': access_token,'refresh_token': refresh_token}, 200)
+
+@app.route('/api/users/logout/access', methods=['POST'])
+@cross_origin(supports_credentials=True)
+@jwt_required
+def logout():
+    if request.method == 'POST':
+        try:
+            token = get_raw_jwt()['access_token']
+            BlacklistedTokens.add(BlacklistedTokens(), token)
+
+            return jsonify({'success': 'token revoked successfully'})
+
+        except:
+            return jsonify({'error': 'failure revoking token'})
+
+@app.route('/api/users/logout/refresh', methods=['POST'])
+@cross_origin(supports_credentials=True)
+@jwt_refresh_token_required
+def logout_refresh():
+    if request.method == 'POST':
+        try:
+            token = get_raw_jwt()['refresh_token']
+            BlacklistedTokens.add(BlacklistedTokens(), token)
+
+            return jsonify({'success': 'token revoked successfully'})
+
+        except:
+            return jsonify({'error': 'failure revoking token'})
+
+
+@app.route('/api/users/token/refresh', methods=['POST'])
+@cross_origin(supports_credentials=True)
+@jwt_refresh_token_required
+def refresh_token():
+    if request.method == 'POST':
+        # retrive the user's identity from the refresh token using a Flask-JWT-Extended built-in method
+        current_user = get_jwt_identity()
+        # return a non-fresh token for the user
+        new_token = create_access_token(identity=current_user, fresh=False)
+        return jsonify({'access_token': new_token}, 200)
+
+@jwt.token_in_blacklist_loader
+def check_if_token_in_blacklist(decrypted_token):
+    token = decrypted_token['token']
+    return BlacklistedTokens.isBlackListedToken(token)

@@ -5,7 +5,6 @@ import uuid
 from models.FormDataModel import FormData
 from flask import jsonify
 from schema.FormSchema import FormSchema
-from app import db
 import uuid
 
 form_schema = FormSchema(strict=True)
@@ -68,7 +67,7 @@ class Form(db.Model):
 
     def update(self, unique_id, request):
         form = Form.query.filter_by(unique_id=unique_id).first()
-        
+
         name = request.json['name']
         description = request.json['description']
 
