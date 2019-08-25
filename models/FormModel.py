@@ -67,8 +67,13 @@ class Form(db.Model):
 
         return form_schema.jsonify(form)
 
+<<<<<<< HEAD
     def update(self, unique_id, request, user_id):
         form = Form.query.filter_by(unique_id=unique_id, user_id=user_id).first()
+=======
+    def update(self, unique_id, request):
+        form = Form.query.filter_by(unique_id=unique_id).first()
+>>>>>>> 2761bea38a3ce83198864bbc678e1e65ae19f3c4
 
         name = request.json['name']
         description = request.json['description']

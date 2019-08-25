@@ -1,6 +1,9 @@
 ### Flask Alembic
 - [Docs](https://alembic.sqlalchemy.org/en/latest/tutorial.html#running-our-first-migration)
+<<<<<<< HEAD
 https://www.programcreek.com/python/example/87970/alembic.op.add_column
+=======
+>>>>>>> 2761bea38a3ce83198864bbc678e1e65ae19f3c4
 - run migration: `alembic upgrade head`
 - create new migration `alembic revision -m "Add a column"`
 
