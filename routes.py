@@ -195,6 +195,7 @@ def form_data_count(form_id):
 
 @app.route('/api/users/register', methods=['POST'])
 @cross_origin(supports_credentials=True)
+@jwt_required
 def register():
 
     if request.method == 'POST':
@@ -266,6 +267,7 @@ def refresh_token():
         current_user = get_jwt_identity()
         # return a non-fresh token for the user
         new_token = create_access_token(identity=current_user, fresh=False)
+
         return jsonify({'access_token': new_token})
 
 @jwt.token_in_blacklist_loader

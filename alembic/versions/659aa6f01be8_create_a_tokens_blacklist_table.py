@@ -23,11 +23,7 @@ def upgrade():
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('token', sa.String(200), nullable=False),
         sa.Column('created_at', sa.DateTime, nullable=False, default=datetime.datetime.now().time()),
-<<<<<<< HEAD
         sa.Column('updated_at', sa.DateTime, nullable=True),
-=======
-        sa.Column('updated_at', sa.DateTime, nullable=True,
->>>>>>> 2761bea38a3ce83198864bbc678e1e65ae19f3c4
     )
 
 def downgrade():
