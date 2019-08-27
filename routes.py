@@ -58,16 +58,23 @@ def forms_item(unique_id):
         db.session.commit()
 
 
-@app.route('/api/formz/<form_unique_id>/data', methods=['GET', 'POST'])
+@app.route('/api/formz/<form_unique_id>/app/data', methods=['GET'])
 @cross_origin(supports_credentials=True)
 @jwt_required
-def forms_data(form_unique_id):
-
-    current_user = get_jwt_identity();
-
-    print('current_user' + str(current_user))
+def forms_data_app(form_unique_id):
 
     if request.method == 'GET':
+        current_user = get_jwt_identity()
+
+        return get_formz_data(form_unique_id, current_user)
+
+@app.route('/api/formz/<form_unique_id>/data', methods=['GET', 'POST'])
+@cross_origin(supports_credentials=True)
+def forms_data(form_unique_id):
+
+    if request.method == 'GET':
+        user_id = User.get_user_by_api_key(User(), request.json['api_key']);
+
         # form_data = db.engine.execute("SELECT form_data.id as form_data_id, form_data.form_id,"\
         #                               "form_data.name as name, form_data.description as description,"\
         #                               "form_data.data as data, form_data.created_at as created_at, "\
@@ -75,14 +82,11 @@ def forms_data(form_unique_id):
         #                               "form.user_id as user_id FROM form_data "\
         #                               "JOIN form ON form_data.form_id = form.id WHERE "\
         #                               "form.user_id={} AND form.unique_id='{}'".format(current_user,form_unique_id))
-        form_data = (db.session.query(FormData)
-        .join(Form).filter(Form.user_id==current_user).filter(Form.unique_id==form_unique_id)
-        .all())
 
-        return forms_data_schema.jsonify(form_data)
+        return get_formz_data(form_unique_id, user_id)
 
     if request.method == 'POST':
-        form = Form.query.filter_by(unique_id=form_unique_id, user_id=current_user).first()
+        form = Form.query.filter_by(unique_id=form_unique_id, user_id=user_id).first()
 
         name = request.json['name']
         form_id = form.id
@@ -97,6 +101,13 @@ def forms_data(form_unique_id):
         db.session.commit()
 
         return form_data_schema.jsonify(form_data)
+
+def get_formz_data(form_unique_id, user_id):
+    form_data = (db.session.query(FormData)
+    .join(Form).filter(Form.user_id==user_id).filter(Form.unique_id==form_unique_id)
+    .all())
+
+    return forms_data_schema.jsonify(form_data)
 
 @app.route('/api/formz/<form_unique_id>/data/<form_data_id>', methods=['GET'])
 @cross_origin(supports_credentials=True)

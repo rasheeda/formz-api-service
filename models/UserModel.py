@@ -29,3 +29,8 @@ class User(db.Model):
 
     def verify_password(self, password):
         return pwd_context.verify(password, self.password)
+
+    def get_user_by_api_key(self, api_key):
+        user = User.query.filter_by(api_key=api_key).first()
+
+        return user.id
