@@ -14,6 +14,7 @@ from functools import wraps
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from models.BlacklistedTokens import BlacklistedTokens
 from app import jwt
+import secrets
 
 form_data_schema = FormDataSchema(strict=True)
 forms_data_schema = FormDataSchema(many=True, strict=True)
@@ -72,8 +73,9 @@ def forms_data_app(form_unique_id):
 @cross_origin(supports_credentials=True)
 def forms_data(form_unique_id):
 
+    user = user = User.query.filter_by(api_key=request.json['api_key']).first();
+
     if request.method == 'GET':
-        user_id = User.get_user_by_api_key(User(), request.json['api_key']);
 
         # form_data = db.engine.execute("SELECT form_data.id as form_data_id, form_data.form_id,"\
         #                               "form_data.name as name, form_data.description as description,"\
@@ -83,10 +85,10 @@ def forms_data(form_unique_id):
         #                               "JOIN form ON form_data.form_id = form.id WHERE "\
         #                               "form.user_id={} AND form.unique_id='{}'".format(current_user,form_unique_id))
 
-        return get_formz_data(form_unique_id, user_id)
+        return get_formz_data(form_unique_id, user.id)
 
     if request.method == 'POST':
-        form = Form.query.filter_by(unique_id=form_unique_id, user_id=user_id).first()
+        form = Form.query.filter_by(unique_id=form_unique_id, user_id=user.id).first()
 
         name = request.json['name']
         form_id = form.id
@@ -294,3 +296,27 @@ def my_expired_token_callback(expired_token):
         'sub_status': 42,
         'msg': 'The {} token has expired'.format(token_type)
     }), 401
+
+@app.route('/api/formz/users/key', methods=['GET'])
+@cross_origin(supports_credentials=True)
+@jwt_required
+def get_api_key():
+    if request.method == 'GET':
+        current_user = get_jwt_identity();
+
+        user = User.query.filter_by(id=current_user).first()
+
+        return jsonify({'api_key': user.api_key})
+
+@app.route('/api/formz/users/key/generate', methods=['POST'])
+@cross_origin(supports_credentials=True)
+@jwt_required
+def generate_api_key():
+    if request.method == 'POST':
+        current_user = get_jwt_identity();
+        user = User.query.filter_by(id=current_user).first()
+
+        user.api_key = secrets.token_hex()
+        db.session.commit()
+
+        return jsonify({'api_key': user.api_key})
