@@ -73,7 +73,10 @@ def forms_data_app(form_unique_id):
 @cross_origin(supports_credentials=True)
 def forms_data(form_unique_id):
 
-    user = user = User.query.filter_by(api_key=request.json['api_key']).first();
+    user = User.query.filter_by(api_key=request.json['api_key']).first();
+
+    if user is None:
+        return jsonify({'error': 'invalid api key'}, 404)
 
     if request.method == 'GET':
 
@@ -90,12 +93,15 @@ def forms_data(form_unique_id):
     if request.method == 'POST':
         form = Form.query.filter_by(unique_id=form_unique_id, user_id=user.id).first()
 
+        if form is None:
+            return jsonify({'error': 'invalid form unique id'}, 404)
+
         name = request.json['name']
-        form_id = form.id
         description = request.json['description']
         data = request.json['data']
         created_at = datetime.datetime.now()
         updated_at = datetime.datetime.now()
+        form_id = form.id
 
         form_data = FormData(form_id, name, description, data, created_at, updated_at)
 
