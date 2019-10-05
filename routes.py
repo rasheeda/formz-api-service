@@ -80,14 +80,6 @@ def forms_data(form_unique_id):
 
     if request.method == 'GET':
 
-        # form_data = db.engine.execute("SELECT form_data.id as form_data_id, form_data.form_id,"\
-        #                               "form_data.name as name, form_data.description as description,"\
-        #                               "form_data.data as data, form_data.created_at as created_at, "\
-        #                               "form_data.updated_at as updated_at, form_data.id as id, "\
-        #                               "form.user_id as user_id FROM form_data "\
-        #                               "JOIN form ON form_data.form_id = form.id WHERE "\
-        #                               "form.user_id={} AND form.unique_id='{}'".format(current_user,form_unique_id))
-
         return get_formz_data(form_unique_id, user.id)
 
     if request.method == 'POST':
@@ -150,7 +142,7 @@ def forms_data_count(form_unique_id):
 
     return jsonify(count=countFormData)
 
-@app.route('/api/formz/data/graph', methods=['GET'])
+@app.route('/api/formz/data/graph/count', methods=['GET'])
 @jwt_required
 def formz_data_count_graph():
 
@@ -171,11 +163,13 @@ def formz_data_count_graph():
 
         return jsonify(graph_data)
 
-@app.route('/api/formz/data/count/graph', methods=['GET'])
+@app.route('/api/formz/data/graph/count/date', methods=['GET'])
 @jwt_required
 def formz_period_data_count_graph():
 
     current_user = get_jwt_identity();
+
+    formz = Form.query.filter_by(user_id=current_user).first()
 
     # The number of data posted per day for all forms belonging to user
     # {data:"dddd", data_count:49}
@@ -184,7 +178,7 @@ def formz_period_data_count_graph():
         rows = db.engine.execute("SELECT COUNT(1) as count, CAST(form_data.created_at AS DATE) AS date"\
                                  " FROM form_data "\
                                  " JOIN form ON form.id = form_data.form_id "\
-                                 " WHERE form.id = "+str(current_user)+" GROUP BY CAST(form_data.created_at AS DATE)")
+                                 " WHERE form.id = "+str(formz.id)+" GROUP BY CAST(form_data.created_at AS DATE)")
         data = []
 
         for row in rows:
@@ -197,36 +191,53 @@ def formz_period_data_count_graph():
 
         return jsonify(data)
 
-@app.route('/api/formz/data/count', methods=['GET'])
+@app.route('/api/formz/total/count', methods=['GET'])
 @jwt_required
-def user_formz_data_count():
+def formz_count():
 
     current_user = get_jwt_identity();
 
     if request.method == 'GET':
-        # get the total number of forms for a user
         forms_count = Form.query.filter_by(user_id=current_user).count();
 
-        return forms_count
+        return jsonify(forms_count)
+
+@app.route('/api/formz/data/total/count', methods=['GET'])
+@jwt_required
+def formz_data_count():
+
+    current_user = get_jwt_identity();
+
+    if request.method == 'GET':
+        form = Form.query.filter_by(user_id=current_user).first();
+
+        return jsonify(form_data_count(form.id))
 
 def form_data_count(form_id):
     return FormData.query.filter_by(form_id=form_id).count();
 
 @app.route('/api/users/register', methods=['POST'])
 @cross_origin(supports_credentials=True)
-@jwt_required
 def register():
 
     if request.method == 'POST':
         email = request.json['email']
         password = request.json['password']
 
+        # check if user with the email exists in the database
+        user_exists = User.query.filter_by(email = email).first()
+        if user_exists:
+            return jsonify({'message': 'user email already exists'}), 404
+
         user = User(email, password, '', '', datetime.datetime.now(), datetime.datetime.now())
         user.hash_password(password)
         db.session.add(user)
         db.session.commit()
 
-        return jsonify({'email': user.email, 'id': user.id}), 200
+        access_token = create_access_token(identity=user.id, fresh=True)
+        refresh_token = create_refresh_token(user.id)
+
+        return jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200
 
 @app.route('/api/users/login', methods=['POST'])
 @cross_origin(supports_credentials=True)
@@ -238,7 +249,7 @@ def login():
         user = User.query.filter_by(email = email).first()
 
         if not user or not user.verify_password(password):
-            return "false"
+            return jsonify({'message': 'invalid login'}), 404
 
         # when authenticated, return a fresh access token and a refresh token
         access_token = create_access_token(identity=user.id, fresh=True)
