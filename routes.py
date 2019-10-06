@@ -4,13 +4,10 @@ from models.FormDataModel import FormData
 from flask import request, jsonify
 from app import db
 from schema.FormDataSchema import FormDataSchema
-import datetime
+from datetime import datetime, timedelta
 from flask_cors import CORS, cross_origin
-import uuid
 from models.UserModel import User
 from schema.UserSchema import UserSchema
-import datetime
-from functools import wraps
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from models.BlacklistedTokens import BlacklistedTokens
 from app import jwt
@@ -138,8 +135,6 @@ def forms_data_count(form_unique_id):
                                   "form_data.form_id = form.id WHERE "\
                                   "form.user_id={} AND form.unique_id='{}'".format(current_user, form_unique_id))
 
-    # countFormData = FormData.query.filter_by(unique_id=form_unique_id).count()
-
     return jsonify(count=countFormData)
 
 @app.route('/api/formz/data/graph/count', methods=['GET'])
@@ -172,9 +167,7 @@ def formz_period_data_count_graph():
     formz = Form.query.filter_by(user_id=current_user).first()
 
     # The number of data posted per day for all forms belonging to user
-    # {data:"dddd", data_count:49}
     if request.method == 'GET':
-        # formz_data = FormData.query.group_by(FormData.created_at).limit(10).all()
         rows = db.engine.execute("SELECT COUNT(1) as count, CAST(form_data.created_at AS DATE) AS date"\
                                  " FROM form_data "\
                                  " JOIN form ON form.id = form_data.form_id "\
@@ -209,9 +202,31 @@ def formz_data_count():
     current_user = get_jwt_identity();
 
     if request.method == 'GET':
-        form = Form.query.filter_by(user_id=current_user).first();
+        row = db.engine.execute("SELECT COUNT(1) as count" \
+                                 " FROM form_data " \
+                                 " JOIN form ON form.id = form_data.form_id " \
+                                 " WHERE form.user_id = " + str(current_user))
 
-        return jsonify(form_data_count(form.id))
+        for data in row:
+            count = data.count
+
+        return jsonify(count)
+
+@app.route('/api/formz/data/total/count/daily', methods=['GET'])
+@jwt_required
+def formz_data_daily_count():
+
+    current_user = get_jwt_identity();
+
+    if request.method == 'GET':
+        yesterday = datetime.today() - timedelta(days = 1)
+        count = (db.session.query(FormData)
+                 .join(Form)
+                 .filter(Form.user_id == current_user)
+                 .filter(FormData.created_at > yesterday)
+                 .count())
+
+        return jsonify(count)
 
 def form_data_count(form_id):
     return FormData.query.filter_by(form_id=form_id).count();
@@ -255,7 +270,6 @@ def login():
         access_token = create_access_token(identity=user.id, fresh=True)
         refresh_token = create_refresh_token(user.id)
 
-        # token = jwt.encode({'user': user.id, 'exp': app.config['JWT_ACCESS_TOKEN_EXPIRES'].__str__()}, app.config['JWT_SECRET_KEY'])
         return jsonify({'access_token': access_token,'refresh_token': refresh_token}), 200
 
 @app.route('/api/users/logout/access', methods=['POST'])
@@ -268,7 +282,6 @@ def logout():
             BlacklistedTokens.add(BlacklistedTokens(), token)
 
             return jsonify({'success': 'token revoked successfully'})
-
         except:
             return jsonify({'error': 'failure revoking token'})
 
@@ -282,7 +295,6 @@ def logout_refresh():
             BlacklistedTokens.add(BlacklistedTokens(), token)
 
             return jsonify({'success': 'token revoked successfully'})
-
         except:
             return jsonify({'error': 'failure revoking token'})
 
