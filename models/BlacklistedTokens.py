@@ -15,12 +15,13 @@ class BlacklistedTokens(db.Model):
     def __init__(self, token=None):
         self.token = token
 
-    def add():
-        token = request.json['token']
+    def add(self, token):
+        # print(f'--------> in model ----> {token}')
 
-        blacklistedTokens = BlacklistedTokens(token)
+        blacklist = BlacklistedTokens(token, datetime.datetime.now(), datetime.datetime.now())
 
-        db.session.add(blacklisted)
+        print(f'--------> blacklist ----> {blacklist}')
+        db.session.add(blacklist)
         db.session.commit()
 
     def isBlackListedToken(token):

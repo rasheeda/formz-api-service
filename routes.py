@@ -33,7 +33,6 @@ def forms():
         return Form.get(Form(), current_user)
 
     if request.method == 'POST':
-
         return Form.create(Form(), request, current_user)
 
 @app.route('/api/formz/<unique_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
@@ -44,7 +43,6 @@ def forms_item(unique_id):
     current_user = get_jwt_identity();
 
     if request.method == 'GET':
-
         return Form.getOne(Form(), unique_id, current_user)
 
     if request.method == 'PUT':
