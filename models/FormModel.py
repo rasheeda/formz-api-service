@@ -18,17 +18,19 @@ class Form(db.Model):
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.now().time())
     updated_at = Column(DateTime, nullable=False, default=datetime.datetime.now().time())
     user_id = Column(Integer)
+    is_webhook = Column(Integer)
 
-    def __init__(self, name=None, description=None, unique_id=None, created_at=None, updated_at=None, user_id=None):
+    def __init__(self, name=None, description=None, unique_id=None, created_at=None, updated_at=None, user_id=None, is_webhook=None):
         self.name = name
         self.description = description
         self.unique_id = unique_id
         self.created_at = created_at
         self.updated_at = updated_at
         self.user_id = user_id
+        self.is_webhook = is_webhook
 
-    def get(self, user_id):
-        forms = Form.query.filter_by(user_id=user_id).all()
+    def get(self, user_id, is_webhook):
+        forms = Form.query.filter_by(user_id=user_id).filter_by(is_webhook=is_webhook).all()
 
         alteredForms = []
 
@@ -53,8 +55,9 @@ class Form(db.Model):
         created_at = datetime.datetime.now()
         updated_at = datetime.datetime.now()
         unique_id = uuid.uuid4().hex
+        is_webhook = request.json['is_webhook']
 
-        form = Form(name, description, unique_id, created_at, updated_at, user_id)
+        form = Form(name, description, unique_id, created_at, updated_at, user_id, is_webhook)
 
         db.session.add(form)
         db.session.commit()

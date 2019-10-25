@@ -12,6 +12,8 @@ from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_r
 from models.BlacklistedTokens import BlacklistedTokens
 from app import jwt
 import secrets
+from utils import generate_random_string
+import json
 
 form_data_schema = FormDataSchema(strict=True)
 forms_data_schema = FormDataSchema(many=True, strict=True)
@@ -28,9 +30,10 @@ def index():
 def forms():
     # retrive the user's identity from the refresh token using a Flask-JWT-Extended built-in method
     current_user = get_jwt_identity()
+    print(request)
 
     if request.method == 'GET':
-        return Form.get(Form(), current_user)
+        return Form.get(Form(), current_user, request.args.get('is_webhook'))
 
     if request.method == 'POST':
         return Form.create(Form(), request, current_user)
@@ -86,8 +89,8 @@ def forms_data(form_unique_id):
         name = request.json['name']
         description = request.json['description']
         data = request.json['data']
-        created_at = datetime.datetime.now()
-        updated_at = datetime.datetime.now()
+        created_at = datetime.timestamp(datetime.now())
+        updated_at = datetime.timestamp(datetime.now())
         form_id = form.id
 
         form_data = FormData(form_id, name, description, data, created_at, updated_at)
@@ -242,7 +245,7 @@ def register():
         if user_exists:
             return jsonify({'message': 'user email already exists'}), 404
 
-        user = User(email, password, '', '', datetime.datetime.now(), datetime.datetime.now())
+        user = User(email, password, '', '', datetime.timestamp(datetime.now()), datetime.timestamp(datetime.now()))
         user.hash_password(password)
         db.session.add(user)
         db.session.commit()
@@ -347,3 +350,38 @@ def generate_api_key():
         db.session.commit()
 
         return jsonify({'api_key': user.api_key})
+
+# Webhooks
+@app.route('/w/<webhook_id>', methods=['GET', 'POST'])
+@cross_origin(supports_credentials=True)
+def webhooks(webhook_id):
+    if (request.method == 'GET' or request.method == 'POST'):
+
+        webhook = Form.query.filter_by(unique_id=webhook_id, is_webhook=1).first()
+
+        if webhook is None:
+            return jsonify({'error': 'invalid webhook url'}, 404)
+
+        print(request.json)
+        name = generate_random_string(8)
+        description = ''
+        data = json.dumps(request.json)
+        created_at = datetime.timestamp(datetime.now())
+        updated_at = datetime.timestamp(datetime.now())
+        form_id = webhook.id
+
+        form_data = FormData(form_id, name, description, data, created_at, updated_at)
+
+        db.session.add(form_data)
+        db.session.commit()
+
+        return form_data_schema.jsonify(form_data)
+
+@app.route('/w/<webhook_id>/data', methods=['GET', 'POST'])
+@cross_origin(supports_credentials=True)
+def get_webhooks_data(webhook_id):
+    form_data = (db.session.query(FormData)
+    .join(Form).filter(Form.id==form_id).filter(Form.unique_id==form_unique_id).filter(Form.is_webhook==1)
+    .all())
+
+    return forms_data_schema.jsonify(form_data)
